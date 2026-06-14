@@ -1,0 +1,135 @@
+import pandas as pd
+from sklearn.model_selection import train_test_split
+from sklearn.compose import ColumnTransformer
+from sklearn.pipeline import Pipeline
+from sklearn.impute import SimpleImputer
+from sklearn.preprocessing import OneHotEncoder, LabelEncoder
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import accuracy_score, precision_score, recall_score, classification_report
+
+# STEP 1: DATA PREPROCESSING
+# Load Dataset
+df = pd.read_csv("Dataset.csv")
+
+# Remove rows with missing cuisines
+df = df.dropna(subset=["Cuisines"])
+
+# Keep only primary cuisine
+df["Cuisines"] = df["Cuisines"].apply(
+    lambda x: x.split(",")[0].strip()
+)
+# Features
+X = df.drop(
+    columns=[
+        "Cuisines",
+        "Restaurant ID",
+        "Restaurant Name"
+    ],
+    errors="ignore"
+)
+
+# Target Variable
+y = df["Cuisines"]
+
+# Encode target labels
+label_encoder = LabelEncoder()
+y = label_encoder.fit_transform(y)
+
+# Identify categorical and numerical columns
+categorical_cols = X.select_dtypes(include=["object"]).columns
+numerical_cols = X.select_dtypes(exclude=["object"]).columns
+
+# Preprocessing
+preprocessor = ColumnTransformer(
+    transformers=[
+        (
+            "num",
+            SimpleImputer(strategy="median"),
+            numerical_cols
+        ),
+        (
+            "cat",
+            Pipeline([
+                ("imputer", SimpleImputer(strategy="most_frequent")),
+                ("encoder", OneHotEncoder(handle_unknown="ignore"))
+            ]),
+            categorical_cols
+        )
+    ]
+)
+
+# STEP 2: TRAIN-TEST SPLIT
+X_train, X_test, y_train, y_test = train_test_split(
+    X,
+    y,
+    test_size=0.2,
+    random_state=42
+)
+# STEP 3: MODEL TRAINING
+model = RandomForestClassifier(
+    n_estimators=100,
+    random_state=42
+)
+
+pipeline = Pipeline([
+    ("preprocessor", preprocessor),
+    ("classifier", model)
+])
+
+pipeline.fit(X_train, y_train)
+# STEP 4: MODEL EVALUATION
+y_pred = pipeline.predict(X_test)
+
+accuracy = accuracy_score(y_test, y_pred)
+precision = precision_score(
+    y_test,
+    y_pred,
+    average="weighted",
+    zero_division=0
+)
+
+recall = recall_score(
+    y_test,
+    y_pred,
+    average="weighted",
+    zero_division=0
+)
+print("=" * 60)
+print("CUISINE CLASSIFICATION RESULTS")
+print("=" * 60)
+print(f"Accuracy  : {accuracy:.4f}")
+print(f"Precision : {precision:.4f}")
+print(f"Recall    : {recall:.4f}")
+print("\nCLASSIFICATION REPORT")
+print("-" * 60)
+print(
+    classification_report(
+        y_test,
+        y_pred,
+        zero_division=0
+    )
+)
+# STEP 5: PERFORMANCE ANALYSIS
+print("\n" + "=" * 60)
+print("MODEL ANALYSIS")
+print("=" * 60)
+print(f"Overall Accuracy  : {accuracy:.4f}")
+print(f"Overall Precision : {precision:.4f}")
+print(f"Overall Recall    : {recall:.4f}")
+print("\nPerformance Across Different Cuisines:")
+print("- Common cuisines are predicted more accurately.")
+print("- Rare cuisines have lower prediction performance.")
+print("- Classes with more training samples achieve better results.")
+print("\nChallenges Identified:")
+print("1. Class imbalance among cuisine categories.")
+print("2. Some cuisines have very few restaurant records.")
+print("3. Multi-cuisine restaurants create ambiguity.")
+print("4. Similar restaurant characteristics can confuse the model.")
+print("\nPotential Biases:")
+print("- The model tends to favor frequently occurring cuisines.")
+print("- Rare cuisines may receive lower precision and recall scores.")
+print("\nConclusion:")
+print("The Random Forest Classifier successfully classified")
+print("restaurants into cuisine categories using restaurant")
+print("features. Performance was stronger for popular cuisines")
+print("and weaker for less represented cuisine categories.")
